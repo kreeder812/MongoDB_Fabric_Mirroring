@@ -17,6 +17,9 @@ MONGODB_READING_BATCH_SIZE = 100000
 
 METADATA_FILE_NAME = "_metadata.json"
 
+# May 2026- added new file name for _partnerEvents.json, used for Telemetry
+PARTNER_EVENTS_FILE_NAME = "_partnerEvents.json"
+
 ROW_MARKER_COLUMN_NAME = "__rowMarker__"
 
 CHANGE_STREAM_OPERATION_MAP = {
