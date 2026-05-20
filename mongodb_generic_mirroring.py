@@ -12,6 +12,7 @@ from listening import listening
 from schema_utils import init_table_schema
 from constants import (
     METADATA_FILE_NAME,
+    PARTNER_EVENTS_FILE_NAME
 )
 from push_file_to_lz import push_file_to_lz
 from file_utils import FileType, read_from_file
@@ -91,6 +92,27 @@ def mirror():
                 )
             logger.info("writing metadata file to LZ")
             push_file_to_lz(metadata_json_path, collection_name)
+
+        partner_events_file_exists = read_from_file(
+            collection_name, PARTNER_EVENTS_FILE_NAME, FileType.TEXT
+        )
+        if not partner_events_file_exists:
+            partner_events_template_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "_partnerEvents_template.json"
+            )
+            partner_events_output_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), PARTNER_EVENTS_FILE_NAME
+            )
+            logger.info("writing _partnerEvents.json file to LZ")
+            with open(partner_events_template_path, 'r') as f:
+                partner_events_content = f.read()
+            partner_events_content = partner_events_content \
+                .replace('${MONGO_DB_NAME}', os.getenv('MONGO_DB_NAME', '')) \
+                .replace('${MONGO_COLLECTION}', collection_name) \
+                .replace('${LZ_URL}', os.getenv('LZ_URL', ''))
+            with open(partner_events_output_path, 'w') as output_file:
+                output_file.write(partner_events_content)
+            push_file_to_lz(partner_events_output_path, collection_name)
 
         init_table_schema(collection_name)
 

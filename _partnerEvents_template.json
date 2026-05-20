@@ -1,0 +1,12 @@
+{
+  "partnerName": "MongoDB",
+  "sourceInfo": {
+    "sourceType": "Documents",
+    "sourceVersion": "2026",
+    "additionalInformation": {
+      "MongoDBDatabase": "${MONGO_DB_NAME}",
+      "MongoDBCollection": "${MONGO_COLLECTION}",
+      "LandingZone": "${LZ_URL}"
+    }
+  }
+}
