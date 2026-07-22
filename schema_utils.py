@@ -410,6 +410,7 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
         ##if current_dtype == datetime and schema_of_this_column[DTYPE_KEY] == object:
         #print(f"****is_datetime64_any_dtype(df['col_name']): {is_datetime64_any_dtype(df[col_name])}")
         #print(f"****is_object_dtype(schema_of_this_column[DTYPE_KEY]): {is_object_dtype(schema_of_this_column[DTYPE_KEY])}")
+
         if is_datetime64_any_dtype(df[col_name]) and is_object_dtype(schema_of_this_column[DTYPE_KEY]):
             df[col_name] = df[col_name].astype(str)
         elif current_dtype.__str__() != schema_of_this_column[DTYPE_KEY].__str__():
@@ -417,17 +418,29 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
                 logger.debug(
                     f"different column dtype detected1: current_dtype={current_dtype}, item type from schema 1 ={schema_of_this_column[DTYPE_KEY]}"
                 )
-                if is_datetime64_any_dtype(schema_of_this_column[DTYPE_KEY]):
+                target_dtype = schema_of_this_column[DTYPE_KEY]
+                if is_datetime64_any_dtype(target_dtype):
                     converted = pd.to_datetime(df[col_name], utc=True, errors='coerce')
-                    df[col_name] = converted.dt.tz_localize(None).astype(schema_of_this_column[DTYPE_KEY])
+                    df[col_name] = converted.dt.tz_localize(None).astype(target_dtype)
+                elif pd.api.types.is_bool_dtype(target_dtype):
+                    df[col_name] = df[col_name].map(
+                        {True: True, False: False, 'true': True, 'false': False,
+                         'True': True, 'False': False, '1': True, '0': False,
+                         1: True, 0: False, '': None, None: None}
+                    ).astype(target_dtype)
+                elif pd.api.types.is_numeric_dtype(target_dtype):
+                    df[col_name] = pd.to_numeric(df[col_name], errors='coerce').astype(target_dtype)
                 else:
-                    df[col_name] = df[col_name].astype(schema_of_this_column[DTYPE_KEY])
-                
+                    df[col_name] = df[col_name].astype(target_dtype)
+
             except (ValueError, TypeError) as e:
                 logger.warning(
                     f"An {e.__class__.__name__} was caught when trying to convert "
                     + f"the dtype of the column {col_name} from {current_dtype} to {schema_of_this_column[DTYPE_KEY]}"
                 )
+
+
+    
     # Check if conversion log file exists before pushing
     print("conversion_flag: ", conversion_flag)
     conversion_log_path = os.path.join(get_table_dir(table_name), CONVERSION_LOG_FILE_NAME)
