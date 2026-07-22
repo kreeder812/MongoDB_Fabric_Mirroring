@@ -411,7 +411,7 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
         #print(f"****is_datetime64_any_dtype(df['col_name']): {is_datetime64_any_dtype(df[col_name])}")
         #print(f"****is_object_dtype(schema_of_this_column[DTYPE_KEY]): {is_object_dtype(schema_of_this_column[DTYPE_KEY])}")
         if is_datetime64_any_dtype(df[col_name]) and is_object_dtype(schema_of_this_column[DTYPE_KEY]):
-            do_nothing
+            df[col_name] = df[col_name].astype(str)
         elif current_dtype.__str__() != schema_of_this_column[DTYPE_KEY].__str__():
             try:
                 logger.debug(
@@ -429,3 +429,4 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
     conversion_log_path = os.path.join(get_table_dir(table_name), CONVERSION_LOG_FILE_NAME)
     if os.path.exists(conversion_log_path) and conversion_flag:
         push_file_to_lz(conversion_log_path, table_name)
+# Fix datetime-to-string coercion bug in schema_utils.py
