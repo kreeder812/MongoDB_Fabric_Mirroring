@@ -410,8 +410,8 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
         ##if current_dtype == datetime and schema_of_this_column[DTYPE_KEY] == object:
         #print(f"****is_datetime64_any_dtype(df['col_name']): {is_datetime64_any_dtype(df[col_name])}")
         #print(f"****is_object_dtype(schema_of_this_column[DTYPE_KEY]): {is_object_dtype(schema_of_this_column[DTYPE_KEY])}")
-###
-    if is_datetime64_any_dtype(df[col_name]) and is_object_dtype(schema_of_this_column[DTYPE_KEY]):
+        #######
+        if is_datetime64_any_dtype(df[col_name]) and is_object_dtype(schema_of_this_column[DTYPE_KEY]):
             df[col_name] = df[col_name].astype(str)
         elif current_dtype.__str__() != schema_of_this_column[DTYPE_KEY].__str__():
             try:
@@ -440,8 +440,8 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
                     f"An {e.__class__.__name__} was caught when trying to convert "
                     + f"the dtype of the column {col_name} from {current_dtype} to {schema_of_this_column[DTYPE_KEY]}"
                 )
-
-###
+   
+    
     
     # Check if conversion log file exists before pushing
     print("conversion_flag: ", conversion_flag)
