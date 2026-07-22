@@ -417,13 +417,17 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
                 logger.debug(
                     f"different column dtype detected1: current_dtype={current_dtype}, item type from schema 1 ={schema_of_this_column[DTYPE_KEY]}"
                 )
-                df[col_name] = df[col_name].astype(schema_of_this_column[DTYPE_KEY])
+                if is_datetime64_any_dtype(schema_of_this_column[DTYPE_KEY]):
+                    converted = pd.to_datetime(df[col_name], utc=True, errors='coerce')
+                    df[col_name] = converted.dt.tz_localize(None).astype(schema_of_this_column[DTYPE_KEY])
+                else:
+                    df[col_name] = df[col_name].astype(schema_of_this_column[DTYPE_KEY])
                 
             except (ValueError, TypeError) as e:
                 logger.warning(
                     f"An {e.__class__.__name__} was caught when trying to convert "
                     + f"the dtype of the column {col_name} from {current_dtype} to {schema_of_this_column[DTYPE_KEY]}"
-                )  
+                )
     # Check if conversion log file exists before pushing
     print("conversion_flag: ", conversion_flag)
     conversion_log_path = os.path.join(get_table_dir(table_name), CONVERSION_LOG_FILE_NAME)
