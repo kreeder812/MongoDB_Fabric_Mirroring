@@ -164,6 +164,11 @@ COLUMN_DTYPE_CONVERSION_MAP = {
 # Maps column_name -> (python_type, pandas_dtype_string)
 FORCED_COLUMN_TYPES = {
     "isImported": (str, "object"),
+    "subhaulerPayrollProcessed": (str, "object"),
+    "driverPickupDelayAfterAck": (str, "object"),
+    "driverPickupDelayAfterScheduledTimeAck": (str, "object"),
+    "driverDeliveryStartDelayAfterPickupArrivalAck": (str, "object"),
+    "isDriverAssignedByAI": (str, "object"),
 }
 
 
