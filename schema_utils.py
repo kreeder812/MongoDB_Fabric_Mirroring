@@ -30,13 +30,14 @@ from pandas.api.types import (
     is_datetime64_any_dtype
 )
 
-
 logger = logging.getLogger(f"{__name__}")
+
 #17June2025 - added NoneType manually instead of importing from types for 3.9 and lesser Python versions
 NoneType = type(None)
 
+
 def _converter_template(obj, type_name, raw_convert_func, default_value=None):
-    original_type = type(obj) 
+    original_type = type(obj)
     logger.debug(f"Converting {obj} of type {original_type} to {type_name}.")
     try:
         return raw_convert_func(obj)
@@ -44,7 +45,6 @@ def _converter_template(obj, type_name, raw_convert_func, default_value=None):
         logger.warning(f'Unsuccessful conversion from "{obj}" of type {original_type} to {type_name}.')
         global conversion_flag
         conversion_flag = True
-
         append_to_file(
             f"\n{current_column_name:<20} | {str(obj):<20} | {str(default_value):<20}",
             table_name,
@@ -64,15 +64,16 @@ def to_string(obj) -> str:
 
 def to_numpy_int64(obj) -> np.int64:
     logger.debug(f"to_numpy_int64: obj={obj}, type={type(obj)}")
+
     def raw_to_numpy_int64(obj) -> np.int64:
         # there's a rare case that converting a list of int to numpy.int64 won't
         # raise any error, hence covering it here separately
-        if isinstance(obj, bson.Decimal128): 
+        if isinstance(obj, bson.Decimal128):
             return np.int64(obj.to_decimal())
         if isinstance(obj, list) or isinstance(obj, dict):
             return to_json_string(obj)
         if obj is not None and not pd.isna(obj):
-           return np.int64(obj)
+            return np.int64(obj)
         else:
             return None
 
@@ -119,12 +120,14 @@ def to_json_string(obj) -> str:
         return _converter_template(obj, "string", lambda o: json.dumps([ob for ob in o], default=str, cls=CustomJSONEncoder))
     return _converter_template(obj, "string", lambda o: json.dumps(o, default=str, cls=CustomJSONEncoder) if o is not None and not pd.isna(o) else '')
 
+
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         conversion_fcn = TYPE_TO_CONVERT_FUNCTION_MAP.get(type(obj))
         if conversion_fcn:
             return conversion_fcn(obj)
         return super(CustomJSONEncoder, self).default(obj)
+
 
 TYPE_TO_CONVERT_FUNCTION_MAP = {
     str: to_string,
@@ -156,27 +159,46 @@ COLUMN_DTYPE_CONVERSION_MAP = {
 }
 
 
-def init_column_schema(column_dtype, first_item) -> dict:
+# Columns whose Fabric-committed schema is known and must be forced,
+# to avoid schema-merge flip-flopping when source data types vary by batch.
+# Maps column_name -> (python_type, pandas_dtype_string)
+FORCED_COLUMN_TYPES = {
+    "isImported": (str, "object"),
+}
+
+
+def init_column_schema(column_dtype, first_item, column_name=None) -> dict:
+    if column_name in FORCED_COLUMN_TYPES:
+        forced_item_type, forced_column_dtype = FORCED_COLUMN_TYPES[column_name]
+        schema_of_this_column = {}
+        schema_of_this_column[DTYPE_KEY] = forced_column_dtype
+        schema_of_this_column[TYPE_KEY] = forced_item_type
+        logger.debug(
+            f"Forced schema override for column {column_name}: "
+            f"dtype={forced_column_dtype}, type={forced_item_type}"
+        )
+        return schema_of_this_column
+
     item_type = type(first_item)
     schema_of_this_column = {}
     if any(isinstance(first_item, t) for t in TYPES_TO_CONVERT_TO_STR):
         item_type = str
     # when encountering NoneType column, force convert it to str
     if item_type == NoneType:
-    # if item_type is None:
+        # if item_type is None:
         item_type = str
         column_dtype = "object"
-    #Diana - handling bson.Decimal128 cant be target data type as it cant be written to parquet
+    # Diana - handling bson.Decimal128 cant be target data type as it cant be written to parquet
     if isinstance(first_item, bson.Decimal128):
         item_type = float
-    #It takes column dtype as object otherwise     
-    #    column_dtype = "object"
+        # It takes column dtype as object otherwise
+        #    column_dtype = "object"
         column_dtype = "float64"
-    #Diana 107 comment and prints added
+    # Diana 107 comment and prints added
     # if not column_dtype:
-    #print(f"SU: original column_dtype={column_dtype}")
+    # print(f"SU: original column_dtype={column_dtype}")
     column_dtype = COLUMN_DTYPE_CONVERSION_MAP.get(column_dtype.__str__(), column_dtype)
-    #print(f"SU: converted column_dtype={column_dtype}")
+    # print(f"SU: converted column_dtype={column_dtype}")
     schema_of_this_column[DTYPE_KEY] = column_dtype
     schema_of_this_column[TYPE_KEY] = item_type
     logger.debug(
@@ -218,6 +240,7 @@ def _get_first_valid_id(df: pd.DataFrame, column_name: str):
     # return first_valid_item
     return first_valid_index_id
 
+
 def _get_first_item(df: pd.DataFrame, column_name: str):
     """
     Get the first non-null item from given DataFrame column.
@@ -242,17 +265,18 @@ def _get_first_item(df: pd.DataFrame, column_name: str):
     )
     return first_valid_item
 
+
 def init_table_schema(table_name: str):
     # determine if the internal schema file exist
     table_dir = get_table_dir(table_name)
-    #schema_file_path = os.path.join(table_dir, INTERNAL_SCHEMA_FILE_NAME)
+    # schema_file_path = os.path.join(table_dir, INTERNAL_SCHEMA_FILE_NAME)
     schema_of_this_table = read_from_file(
         table_name, INTERNAL_SCHEMA_FILE_NAME, FileType.PICKLE
     )
     if schema_of_this_table:
         logger.info(f"loaded schema of {table_name} from file")
-    #    schemas.init_table_schema(table_name, schema_of_this_table)
-    # 9 May 2025 should not write back to internal schema file
+        #    schemas.init_table_schema(table_name, schema_of_this_table)
+        # 9 May 2025 should not write back to internal schema file
         schemas.init_table_schema_to_mem(table_name, schema_of_this_table)
         # load column renaming if it exists, otherwise this table has been previously
         # initiated but no column is renamed, so we don't need to do anything
@@ -272,10 +296,10 @@ def init_table_schema(table_name: str):
         column_renaming_of_this_table = {}
         with collection.find().sort({"_id": 1}).limit(batch_size) as cursor:
             fetched_data = list(cursor)
-            #print(f"fetched_data: {fetched_data}")
+            # print(f"fetched_data: {fetched_data}")
             df = pd.DataFrame(fetched_data)
             # Infering better datatypes from the dataframe
-            df = df.convert_dtypes(dtype_backend="pyarrow") 
+            df = df.convert_dtypes(dtype_backend="pyarrow")
             for col_name in df.keys().values:
                 get_id = _get_first_valid_id(df, col_name)
                 # Fetch the exact value from mongodb using the _id, dumping into df changes the data type.
@@ -289,7 +313,7 @@ def init_table_schema(table_name: str):
                 column_dtype = df[col_name].dtype
                 # column_dtype = type(data)
                 # schema_of_this_column = init_column_schema(column_dtype, first_item)
-                schema_of_this_column = init_column_schema(column_dtype, data)
+                schema_of_this_column = init_column_schema(column_dtype, data, column_name=col_name)
                 processed_col_name = process_column_name(col_name)
                 if processed_col_name != col_name:
                     column_renaming_of_this_table[col_name] = processed_col_name
@@ -305,24 +329,23 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
     for col_name in df.keys().values:
         current_dtype = df[col_name].dtype
         current_first_item = _get_first_item(df, col_name)
-        #current_item_type = type(current_first_item)
-        
+        # current_item_type = type(current_first_item)
 
         processed_col_name = schemas.find_column_renaming(table_name, col_name)
         logger.debug(
-                    f"%%%% Processed col name found: processed_col_name is {processed_col_name} %%%%%"
+            f"%%%% Processed col name found: processed_col_name is {processed_col_name} %%%%%"
         )
         schema_of_this_column = schemas.get_table_column_schema(table_name, col_name)
         logger.debug(
-                    f"%%%% In process_df: schema_of_this_column is {schema_of_this_column} %%%%%"
-                )
+            f"%%%% In process_df: schema_of_this_column is {schema_of_this_column} %%%%%"
+        )
         if not processed_col_name and not schema_of_this_column:
             logger.debug(
-                    f"%%%% In process_df, schema of col doesnt exist: schema_of_this_column is {schema_of_this_column} and processed_col_name is {processed_col_name} %%%%%"
-                )
+                f"%%%% In process_df, schema of col doesnt exist: schema_of_this_column is {schema_of_this_column} and processed_col_name is {processed_col_name} %%%%%"
+            )
             # new column, process it and append schema
             schema_of_this_column = init_column_schema(
-                current_dtype, current_first_item
+                current_dtype, current_first_item, column_name=col_name
             )
             processed_col_name = process_column_name(col_name)
             if processed_col_name != col_name:
@@ -330,7 +353,6 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
             schemas.append_schema_column(
                 table_name, processed_col_name, schema_of_this_column
             )
-
         # processed_col_name might have been updated for new column, so no need to use elif here
         # 2 scenarios are included by this if clause:
         #       1. existing column renaming found
@@ -343,10 +365,9 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
             col_name = processed_col_name
             # May 9 : get schema from file for the renamed column
             schema_of_this_column = schemas.get_table_column_schema(table_name, col_name)
-
         # schema_of_this_column should always exists at this point
         # existing column or new column with schema appended, process according to schema_of_this_column
-        #if current_item_type != schema_of_this_column[TYPE_KEY]:
+        # if current_item_type != schema_of_this_column[TYPE_KEY]:
         expected_type = schema_of_this_column[TYPE_KEY]
         for item in df[col_name]:
             current_column_name = col_name
@@ -357,60 +378,57 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
                 conversion_fcn = TYPE_TO_CONVERT_FUNCTION_MAP.get(
                     expected_type, do_nothing
                 )
-                
+
                 # Set the current column name for logging
                 df[col_name] = df[col_name].apply(conversion_fcn)
                 print(df[col_name])
                 break
         # for index, item in enumerate(df[col_name]):
-            # print(f"Row {index}: Value={item}, Type={type(item)}")
-            
+        # print(f"Row {index}: Value={item}, Type={type(item)}")
+
         current_dtype = df[col_name].dtype
         logger.debug(f"current_dtype={current_dtype}")
         logger.debug(
             f"schema_of_this_column[DTYPE_KEY]={schema_of_this_column[DTYPE_KEY]}"
         )
-
         if (expected_type == bson.int64.Int64 or expected_type == int) and current_dtype == "float64":
             # Convert to int64
             logger.debug(
                 f"Converting column {col_name} from float64 to Int64"
-            )   
+            )
             df[col_name] = df[col_name].astype("Int64")
-
         current_dtype = df[col_name].dtype
-        #if current_dtype != schema_of_this_column[DTYPE_KEY]:
+        # if current_dtype != schema_of_this_column[DTYPE_KEY]:
         logger.debug(
             f">>>>>>>>>>current_dtype: {current_dtype}"
-            )
-        ##column_final_dtype = COLUMN_DTYPE_CONVERSION_MAP.get(current_dtype.__str__(), DEFAULT_DTYPE)
+        )
+        # column_final_dtype = COLUMN_DTYPE_CONVERSION_MAP.get(current_dtype.__str__(), DEFAULT_DTYPE)
         # Date type needs to be converted to MILLIS from NANOS in all cases
         if is_datetime64_any_dtype(df[col_name]):
             try:
                 logger.debug(
                     f"different column dtype detected: current_dtype={current_dtype}, item type from default=datetime64[ms]"
                 )
-                #df[col_name] = df[col_name].dt.floor('ms')
+                # df[col_name] = df[col_name].dt.floor('ms')
                 df[col_name] = df[col_name].dt.tz_localize(None)
-                df[col_name] = df[col_name].astype("datetime64[ms]")      
+                df[col_name] = df[col_name].astype("datetime64[ms]")
             except (ValueError, TypeError) as e:
                 logger.warning(
                     f"An {e.__class__.__name__} was caught when trying to convert "
                     + f"the dtype of the column {col_name} from {current_dtype} to datetime64[ms]"
                 )
-        
+
         current_dtype = df[col_name].dtype
-        #if current_dtype != schema_of_this_column[DTYPE_KEY]:
+        # if current_dtype != schema_of_this_column[DTYPE_KEY]:
         logger.debug(
             f">>>>>>>>>>current_dtype 1: {current_dtype}, "
             f">>>>>>>>>>schema_of_this_column[DTYPE_KEY] 1: {schema_of_this_column[DTYPE_KEY]}, "
             f"****is_datetime64_any_dtype(df['col_name']): {is_datetime64_any_dtype(df[col_name])}, "
             f"****is_object_dtype(schema_of_this_column[DTYPE_KEY]): {is_object_dtype(schema_of_this_column[DTYPE_KEY])}"
-            )
-        ##if current_dtype == datetime and schema_of_this_column[DTYPE_KEY] == object:
-        #print(f"****is_datetime64_any_dtype(df['col_name']): {is_datetime64_any_dtype(df[col_name])}")
-        #print(f"****is_object_dtype(schema_of_this_column[DTYPE_KEY]): {is_object_dtype(schema_of_this_column[DTYPE_KEY])}")
-        #######
+        )
+        # if current_dtype == datetime and schema_of_this_column[DTYPE_KEY] == object:
+        # print(f"****is_datetime64_any_dtype(df['col_name']): {is_datetime64_any_dtype(df[col_name])}")
+        # print(f"****is_object_dtype(schema_of_this_column[DTYPE_KEY]): {is_object_dtype(schema_of_this_column[DTYPE_KEY])}")
         if is_datetime64_any_dtype(df[col_name]) and is_object_dtype(schema_of_this_column[DTYPE_KEY]):
             df[col_name] = df[col_name].astype(str)
         elif current_dtype.__str__() != schema_of_this_column[DTYPE_KEY].__str__():
@@ -440,12 +458,9 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
                     f"An {e.__class__.__name__} was caught when trying to convert "
                     + f"the dtype of the column {col_name} from {current_dtype} to {schema_of_this_column[DTYPE_KEY]}"
                 )
-   
-    
-    
+
     # Check if conversion log file exists before pushing
     print("conversion_flag: ", conversion_flag)
     conversion_log_path = os.path.join(get_table_dir(table_name), CONVERSION_LOG_FILE_NAME)
     if os.path.exists(conversion_log_path) and conversion_flag:
         push_file_to_lz(conversion_log_path, table_name)
-# Fix datetime-to-string coercion bug in schema_utils.py
