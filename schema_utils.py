@@ -186,6 +186,7 @@ FORCED_COLUMN_TYPES = {
     "exactMiles": (float, "float64"),
     "minWeightInTons": (float, "float64"),
     "startingOdometerReading": (float, "float64"),
+    "billingZonesMaxMiles": (int, "Int64"),
     
 }
 
