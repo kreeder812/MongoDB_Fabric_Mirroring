@@ -163,23 +163,34 @@ COLUMN_DTYPE_CONVERSION_MAP = {
 # to avoid schema-merge flip-flopping when source data types vary by batch.
 # Maps column_name -> (python_type, pandas_dtype_string)
 FORCED_COLUMN_TYPES = {
+    # Boolean-mismatch columns (Fabric's committed schema had already drifted to string)
     "isImported": (str, "object"),
-    "isActive": (str, "object"),
-    "outofService": (str, "object"),
-    "cabCardRequired": (str, "object"),
     "subhaulerPayrollProcessed": (str, "object"),
     "driverPickupDelayAfterAck": (str, "object"),
     "driverPickupDelayAfterScheduledTimeAck": (str, "object"),
     "driverDeliveryStartDelayAfterPickupArrivalAck": (str, "object"),
     "isDriverAssignedByAI": (str, "object"),
+    "outofService": (str, "object"),
+
+    # ds_loads numeric columns (bigint -> Int64)
     "miles": (int, "Int64"),
     "lastStopIndex": (int, "Int64"),
-    "pullTrailerYear": (int, "Int64"),
-    "semiTrailerYear": (int, "Int64"),
-    "semiTrailerWeight": (int, "Int64"),
-    "unitNumber": (float, "float64"),
+    "billingZonesMaxMiles": (int, "Int64"),
+    "billingZonesMinMiles": (int, "Int64"),
+    "dimension1": (int, "Int64"),
+    "divWeight3": (int, "Int64"),
+    "diversionNo3": (int, "Int64"),
+    "leg": (int, "Int64"),
+    "priority": (int, "Int64"),
+    "totalLegs": (int, "Int64"),
+    "zoneNumber": (int, "Int64"),
+
+    # ds_loads numeric columns (float -> float64)
     "billingSummary": (float, "float64"),
     "customerBaseAmount": (float, "float64"),
+    "customerZoneRate": (float, "float64"),
+    "dimension2": (float, "float64"),
+    "dimension3": (float, "float64"),
     "divWeight1": (float, "float64"),
     "divWeight2": (float, "float64"),
     "diversionNo1": (float, "float64"),
@@ -191,9 +202,19 @@ FORCED_COLUMN_TYPES = {
     "exactMiles": (float, "float64"),
     "minWeightInTons": (float, "float64"),
     "startingOdometerReading": (float, "float64"),
-    "billingZonesMaxMiles": (int, "Int64"),
-    "billingZonesMinMiles": (int, "Int64"),
-    
+
+    # ds_trailers numeric columns (bigint -> Int64)
+    "pullTrailerYear": (int, "Int64"),
+    "pullTrailerWeight": (int, "Int64"),
+    "semiTrailerYear": (int, "Int64"),
+    "semiTrailerWeight": (int, "Int64"),
+
+    # ds_trucks numeric columns
+    "tareWeight": (int, "Int64"),
+    "weight": (int, "Int64"),
+    "year": (int, "Int64"),
+    "unitNumber": (float, "float64"),
+  
 }
 
 
