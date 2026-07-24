@@ -170,7 +170,22 @@ FORCED_COLUMN_TYPES = {
     "driverDeliveryStartDelayAfterPickupArrivalAck": (str, "object"),
     "isDriverAssignedByAI": (str, "object"),
     "miles": (int, "Int64"),
+    "lastStopIndex": (int, "Int64"),
     "pullTrailerYear": (int, "Int64"),
+    "unitNumber": (float, "float64"),
+    "billingSummary": (float, "float64"),
+    "customerBaseAmount": (float, "float64"),
+    "divWeight1": (float, "float64"),
+    "divWeight2": (float, "float64"),
+    "diversionNo1": (float, "float64"),
+    "diversionNo2": (float, "float64"),
+    "driverBaseAmount": (float, "float64"),
+    "driverBillingSummary": (float, "float64"),
+    "driverZoneRate": (float, "float64"),
+    "estimatedDriverPay": (float, "float64"),
+    "exactMiles": (float, "float64"),
+    "minWeightInTons": (float, "float64"),
+    "startingOdometerReading": (float, "float64"),
     
 }
 
