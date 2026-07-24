@@ -164,6 +164,7 @@ COLUMN_DTYPE_CONVERSION_MAP = {
 # Maps column_name -> (python_type, pandas_dtype_string)
 FORCED_COLUMN_TYPES = {
     "isImported": (str, "object"),
+    "isActive": (str, "object"),
     "subhaulerPayrollProcessed": (str, "object"),
     "driverPickupDelayAfterAck": (str, "object"),
     "driverPickupDelayAfterScheduledTimeAck": (str, "object"),
@@ -187,6 +188,7 @@ FORCED_COLUMN_TYPES = {
     "minWeightInTons": (float, "float64"),
     "startingOdometerReading": (float, "float64"),
     "billingZonesMaxMiles": (int, "Int64"),
+    "billingZonesMinMiles": (int, "Int64"),
     
 }
 
