@@ -175,6 +175,8 @@ FORCED_COLUMN_TYPES = {
     "miles": (int, "Int64"),
     "lastStopIndex": (int, "Int64"),
     "pullTrailerYear": (int, "Int64"),
+    "semiTrailerYear": (int, "Int64"),
+    "semiTrailerWeight": (int, "Int64"),
     "unitNumber": (float, "float64"),
     "billingSummary": (float, "float64"),
     "customerBaseAmount": (float, "float64"),
