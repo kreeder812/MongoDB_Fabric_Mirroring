@@ -169,6 +169,9 @@ FORCED_COLUMN_TYPES = {
     "driverPickupDelayAfterScheduledTimeAck": (str, "object"),
     "driverDeliveryStartDelayAfterPickupArrivalAck": (str, "object"),
     "isDriverAssignedByAI": (str, "object"),
+    "miles": (int, "Int64"),
+    "pullTrailerYear": (int, "Int64"),
+    
 }
 
 
