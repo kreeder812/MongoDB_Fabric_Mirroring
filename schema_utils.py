@@ -166,7 +166,7 @@ FORCED_COLUMN_TYPES = {
     "isImported": (str, "object"),
     "isActive": (str, "object"),
     "outofService": (str, "object"),
-    "cabCardRequired": (str, "object")
+    "cabCardRequired": (str, "object"),
     "subhaulerPayrollProcessed": (str, "object"),
     "driverPickupDelayAfterAck": (str, "object"),
     "driverPickupDelayAfterScheduledTimeAck": (str, "object"),
