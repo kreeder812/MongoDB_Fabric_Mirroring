@@ -165,6 +165,8 @@ COLUMN_DTYPE_CONVERSION_MAP = {
 FORCED_COLUMN_TYPES = {
     # Boolean-mismatch columns (Fabric's committed schema had already drifted to string)
     "isImported": (str, "object"),
+    "isActive": (str, "object"),
+    "cabCardRequired": (str, "object"),
     "subhaulerPayrollProcessed": (str, "object"),
     "driverPickupDelayAfterAck": (str, "object"),
     "driverPickupDelayAfterScheduledTimeAck": (str, "object"),
