@@ -1,6 +1,8 @@
 import logging.handlers
 import os
 import logging
+import signal
+import threading
 from threading import Thread
 import pymongo
 from pymongo.errors import ServerSelectionTimeoutError
@@ -129,10 +131,32 @@ def mirror():
 
     # for thread in threads:
     #     thread.join()
-    while True:
-        cmd = input()
-        if cmd.lower() == "quit":
-            os._exit(0)
+
+    # --- Keep-alive, replacing the old input()/stdin-based loop ---
+    # Azure App Service (and most container/service hosts) run this process
+    # with no interactive console attached, so blocking on input() either
+    # hangs forever with nothing to read or raises EOFError immediately if
+    # stdin is closed - neither of which is a reliable way to keep a service
+    # alive, and a crashed/exited process here can trigger platform-level
+    # restarts that re-run mirror() from scratch (which is how a wiped or
+    # unreadable init-sync state file leads to duplicate full re-syncs).
+    #
+    # Block on a threading.Event instead, and release it on SIGTERM/SIGINT
+    # so App Service's normal stop/restart/deploy signal gives this process
+    # a clean, logged shutdown instead of an abrupt kill.
+    stop_event = threading.Event()
+
+    def _handle_shutdown_signal(signum, frame):
+        signal_name = signal.Signals(signum).name
+        logger.info(f"Received {signal_name}, shutting down mirror() cleanly.")
+        stop_event.set()
+
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+    signal.signal(signal.SIGINT, _handle_shutdown_signal)
+
+    logger.info("mirror() startup complete; entering keep-alive wait.")
+    stop_event.wait()
+    logger.info("Shutdown signal received; mirror() exiting.")
 
 
 def __get_all_collections() -> list[str]:
