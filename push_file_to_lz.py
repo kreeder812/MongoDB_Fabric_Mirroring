@@ -94,7 +94,17 @@ def __patch_file(access_token, file_path, lz_url, table_name):
             file_name_temp = '_' + file_name
         else:
             file_name_temp = file_name
-            
+
+        # Fail fast on a locally-empty payload instead of faithfully
+        # uploading 0 bytes to OneLake (root cause of the ds_zones /
+        # ds_loads empty-file incidents).
+        with open(file_path, "rb") as file:
+            file_contents = file.read()
+        if len(file_contents) == 0:
+            raise Exception(
+                f"Refusing to push empty local file to landing zone: {file_path}"
+            )
+
         token_url_temp = base_url + file_name_temp + '_TEMP' + "?resource=file"
         token_url = base_url + file_name
 
@@ -104,21 +114,29 @@ def __patch_file(access_token, file_path, lz_url, table_name):
         # Code to create file in lakehouse
         response = requests.put(token_url_temp, data={}, headers=token_headers)
         logger.debug(response)
+        if response.status_code not in (200, 201):
+            raise Exception(
+                f"Failed to create temp file in landing zone "
+                f"(status {response.status_code}): {response.text}"
+            )
 
         token_url_temp = base_url + file_name_temp + '_TEMP' + "?position=0&action=append&flush=true"
         token_headers = {
             "Authorization": "Bearer " + access_token,
             "x-ms-file-name": file_name,
         }
-            
-        logger.debug(token_url_temp)    
+
+        logger.debug(token_url_temp)
         logger.debug("pushing data to file in lake")
 
         # Code to push Data to Lakehouse
-        with open(file_path, "rb") as file:
-            file_contents = file.read()
-            response = requests.patch(token_url_temp, data=file_contents, headers=token_headers)
+        response = requests.patch(token_url_temp, data=file_contents, headers=token_headers)
         logger.debug(response)
+        if response.status_code not in (200, 202):
+            raise Exception(
+                f"Failed to append file content in landing zone "
+                f"(status {response.status_code}): {response.text}"
+            )
 
         # Rename file from temp to actual name
         token_headers = {
@@ -128,6 +146,13 @@ def __patch_file(access_token, file_path, lz_url, table_name):
         }
         response = requests.put(token_url, headers=token_headers)
         logger.debug(response)
+        if response.status_code not in (200, 201):
+            raise Exception(
+                f"Failed to rename temp file to final name in landing zone "
+                f"(status {response.status_code}): {response.text}"
+            )
+
+        logger.debug(f"Successfully pushed {file_name} ({len(file_contents)} bytes) to landing zone")
     except Exception as e:
         logger.error(f"Error patching file to landing zone: {str(e)}")
         raise
