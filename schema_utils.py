@@ -180,7 +180,6 @@ FORCED_COLUMN_TYPES = {
     "billingZonesMaxMiles": (int, "Int64"),
     "billingZonesMinMiles": (int, "Int64"),
     "dimension1": (int, "Int64"),
-    "divWeight3": (int, "Int64"),
     "diversionNo3": (int, "Int64"),
     "diversionNo4": (int, "Int64"),
     "diversionNo5": (int, "Int64"),
@@ -190,12 +189,6 @@ FORCED_COLUMN_TYPES = {
     "totalLegs": (int, "Int64"),
     "zoneNumber": (int, "Int64"),
     "subHaulerBaseAmount": (int, "Int64"),
-<<<<<<< HEAD
-=======
-    "divWeight4": (float, "float64"),
-    "divWeight5": (float, "float64"),
-    "divWeight6": (float, "float64"),
->>>>>>> 0cf361b513e89f35aa556eb5e61a0c00066fe18f
 
     # ds_loads numeric columns (float -> float64)
     "billingSummary": (float, "float64"),
