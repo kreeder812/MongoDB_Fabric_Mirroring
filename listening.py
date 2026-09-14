@@ -292,6 +292,14 @@ def process_accumulative_df(accumulative_df, collection_name, init_sync_stat_fla
                 # Convert any remaining Object column into String
                 id_col = accumulative_df['_id']
                 obj_cols = accumulative_df.select_dtypes(include=['object']).columns
+                # Don't stringify columns with an explicit forced non-string type -
+                # doing so undoes schema_utils.process_dataframe()'s coercion for any
+                # batch containing a row that failed numeric conversion, which silently
+                # re-breaks fields like subHaulerBaseAmount / divWeight4 right before write.
+                forced_non_string_cols = {
+                    col for col, (t, _) in schema_utils.FORCED_COLUMN_TYPES.items() if t is not str
+                }
+                obj_cols = [c for c in obj_cols if c not in forced_non_string_cols]
                 accumulative_df[obj_cols] = accumulative_df[obj_cols].astype(str,errors="ignore")
                 
                 #  Restore the _id column
