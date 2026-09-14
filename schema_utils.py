@@ -184,6 +184,7 @@ FORCED_COLUMN_TYPES = {
     "priority": (int, "Int64"),
     "totalLegs": (int, "Int64"),
     "zoneNumber": (int, "Int64"),
+    "subHaulerBaseAmount": (int, "Int64"),
 
     # ds_loads numeric columns (float -> float64)
     "billingSummary": (float, "float64"),
@@ -193,6 +194,10 @@ FORCED_COLUMN_TYPES = {
     "dimension3": (float, "float64"),
     "divWeight1": (float, "float64"),
     "divWeight2": (float, "float64"),
+    "divWeight3": (float, "float64"),
+    "divWeight4": (float, "float64"),
+    "divWeight5": (float, "float64"),
+    "divWeight6": (float, "float64"),
     "diversionNo1": (float, "float64"),
     "diversionNo2": (float, "float64"),
     "driverBaseAmount": (float, "float64"),
