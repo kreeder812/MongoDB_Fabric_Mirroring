@@ -189,6 +189,8 @@ FORCED_COLUMN_TYPES = {
     "totalLegs": (int, "Int64"),
     "zoneNumber": (int, "Int64"),
     "subHaulerBaseAmount": (int, "Int64"),
+    "minMiles": (int, "Int64"),
+    "projectedTimeInMinutes": (int, "Int64"),
 
     # ds_loads numeric columns (float -> float64)
     "billingSummary": (float, "float64"),
