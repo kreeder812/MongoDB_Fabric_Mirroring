@@ -191,6 +191,7 @@ FORCED_COLUMN_TYPES = {
     "subHaulerBaseAmount": (int, "Int64"),
     "minMiles": (int, "Int64"),
     "projectedTimeInMinutes": (int, "Int64"),
+    "additionalRate1": (int, "Int64"),
 
     # ds_loads numeric columns (float -> float64)
     "billingSummary": (float, "float64"),
@@ -211,6 +212,7 @@ FORCED_COLUMN_TYPES = {
     "driverZoneRate": (float, "float64"),
     "estimatedDriverPay": (float, "float64"),
     "exactMiles": (float, "float64"),
+    "maxMiles": (float, "float64"),
     "minWeightInTons": (float, "float64"),
     "startingOdometerReading": (float, "float64"),
 
