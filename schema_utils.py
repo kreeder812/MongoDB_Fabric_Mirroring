@@ -173,6 +173,7 @@ FORCED_COLUMN_TYPES = {
     "driverDeliveryStartDelayAfterPickupArrivalAck": (str, "object"),
     "isDriverAssignedByAI": (str, "object"),
     "outofService": (str, "object"),
+    "zip": (str, "string"),
 
     # ds_loads numeric columns (bigint -> Int64)
     "miles": (int, "Int64"),
