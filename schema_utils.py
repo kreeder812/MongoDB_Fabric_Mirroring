@@ -240,6 +240,24 @@ FORCED_COLUMN_TYPES = {
     "weight": (int, "Int64"),
     "year": (int, "Int64"),
     "unitNumber": (float, "float64"),
+
+        # stale-pkl fixes (committed types from Fabric)
+    "numberOfRoute": (int, "Int64"),
+    "rating": (int, "Int64"),
+    "standbyThresholdMiles": (int, "Int64"),
+    "routeCount": (int, "Int64"),
+    "creditLimit": (int, "Int64"),
+    "isSubCustomerCompany": (bool, "boolean"),
+    "emailVerified": (bool, "boolean"),
+    # ds_locations plant metrics
+    "peelTonsPerHourLineA": (float, "float64"),
+    "peelTonsPerHourLineB": (float, "float64"),
+    "peelHoursRunningLineA": (float, "float64"),
+    "brewHouse1CycleTime": (float, "float64"),
+    "brewHouse2CycleTime": (float, "float64"),
+    "brewHouse1LoadsInTank": (float, "float64"),
+    "brewHouse2LoadsInTank": (float, "float64"),
+    "brewHouse1RunTime": (float, "float64"),
   
 }
 
