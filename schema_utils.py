@@ -120,6 +120,15 @@ def to_json_string(obj) -> str:
         return _converter_template(obj, "string", lambda o: json.dumps([ob for ob in o], default=str, cls=CustomJSONEncoder))
     return _converter_template(obj, "string", lambda o: json.dumps(o, default=str, cls=CustomJSONEncoder) if o is not None and not pd.isna(o) else '')
 
+ZIP_COLUMNS = {"zip"}
+
+def normalize_zip(v):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return None
+    if isinstance(v, (int, float, np.integer, np.floating)):
+        return str(int(v)).zfill(5)
+    return str(v).strip()
+
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -432,6 +441,16 @@ def process_dataframe(table_name_param: str, df: pd.DataFrame):
             col_name = processed_col_name
             # May 9 : get schema from file for the renamed column
             schema_of_this_column = schemas.get_table_column_schema(table_name, col_name)
+                # Forced types are authoritative, even over a stale cached schema
+        forced = FORCED_COLUMN_TYPES.get(col_name)
+        if forced:
+            schema_of_this_column = {TYPE_KEY: forced[0], DTYPE_KEY: forced[1]}
+
+        # Zip codes: normalize numeric/float values, keep nulls as nulls
+        if col_name in ZIP_COLUMNS:
+            current_column_name = col_name
+            df[col_name] = df[col_name].map(normalize_zip).astype("string")
+            continue
         # schema_of_this_column should always exists at this point
         # existing column or new column with schema appended, process according to schema_of_this_column
         # if current_item_type != schema_of_this_column[TYPE_KEY]:
