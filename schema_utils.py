@@ -185,6 +185,7 @@ FORCED_COLUMN_TYPES = {
     "zip": (str, "string"),
     "startLocation": (float, "float64"),   # matches existing committed type: double
     "additionalRate2": (int, "Int64"),     # matches existing committed type: long
+    "emailVerified": (bool, "boolean"),    # ds_users, committed boolean
 
     # ds_loads numeric columns (bigint -> Int64)
     "miles": (int, "Int64"),
