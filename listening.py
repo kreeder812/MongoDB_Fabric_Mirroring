@@ -32,8 +32,113 @@ import schemas
 import schema_utils
 from file_utils import FileType, read_from_file, write_to_file
 
+
+# ---------------------------------------------------------------------------
+# Listener resilience: heartbeat watchdog + thread exception logging
+# ---------------------------------------------------------------------------
+# Every listener loop iteration (at least once per max_await_time_ms = 20s, even
+# with no changes) records a heartbeat. If any listener goes silent for longer
+# than LISTENER_STALL_SECONDS - because its thread died or hung - the watchdog
+# logs CRITICAL and exits the process so App Service starts a fresh container,
+# which resumes every collection from its persisted resume token.
+LISTENER_STALL_SECONDS = float(os.getenv("LISTENER_STALL_SECONDS", "600"))
+WATCHDOG_INTERVAL_SECONDS = 60
+MAX_POISON_RETRIES = 3          # same change failing this many times -> skip it
+MAX_ERROR_BACKOFF_SECONDS = 300  # must stay well under LISTENER_STALL_SECONDS
+
+_heartbeats: dict = {}
+_hb_lock = threading.Lock()
+_watchdog_started = False
+
+
+def _beat(collection_name: str):
+    with _hb_lock:
+        _heartbeats[collection_name] = time.time()
+
+
+def _watchdog():
+    log = logging.getLogger(f"{__name__}[watchdog]")
+    log.info(
+        "listener watchdog started (stall threshold %.0fs, check every %ds)",
+        LISTENER_STALL_SECONDS,
+        WATCHDOG_INTERVAL_SECONDS,
+    )
+    while True:
+        time.sleep(WATCHDOG_INTERVAL_SECONDS)
+        now = time.time()
+        with _hb_lock:
+            snapshot = dict(_heartbeats)
+        stalled = {
+            coll: round(now - ts)
+            for coll, ts in snapshot.items()
+            if now - ts > LISTENER_STALL_SECONDS
+        }
+        if stalled:
+            log.critical(
+                "LISTENER STALL: no heartbeat (seconds since last) %s; "
+                "exiting process so App Service restarts the container",
+                stalled,
+            )
+            # Give handlers (incl. the App Insights exporter) a chance to flush.
+            try:
+                logging.shutdown()
+            finally:
+                time.sleep(5)
+                os._exit(1)
+
+
+def _start_watchdog_once():
+    global _watchdog_started
+    with _hb_lock:
+        if _watchdog_started:
+            return
+        _watchdog_started = True
+    Thread(target=_watchdog, name="listener-watchdog", daemon=True).start()
+
+
+def _thread_excepthook(args):
+    # Default behavior only prints to stderr, which never reaches App Insights.
+    if args.exc_type is SystemExit:
+        return
+    logging.getLogger(__name__).critical(
+        "UNCAUGHT exception in thread %s",
+        args.thread.name if args.thread else "<unknown>",
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+    )
+
+
+threading.excepthook = _thread_excepthook
+
+
+def _reload_persisted_resume_token(collection_name: str, logger):
+    """Rewind to the last token written alongside a successful LZ push.
+
+    Used after a non-pymongo failure: the in-memory token has already advanced
+    past changes that were sitting in the (now discarded) unflushed batch, so
+    reusing it would silently drop those changes.
+    """
+    while True:
+        try:
+            return read_from_file(
+                collection_name, DELTA_SYNC_RESUME_TOKEN_FILE_NAME, FileType.PICKLE
+            )
+        except Exception:
+            # If the LZ is unreachable for longer than the stall threshold the
+            # watchdog will restart the container, which is fine.
+            logger.error(
+                "could not read persisted resume token for %s; retrying in 30s",
+                collection_name,
+                exc_info=True,
+            )
+            time.sleep(30)
+
+
 def listening(collection_name: str):
     logger = logging.getLogger(f"{__name__}[{collection_name}]")
+    threading.current_thread().name = f"listener-{collection_name}"
+    _beat(collection_name)
+    _start_watchdog_once()
+
     db_name = os.getenv("MONGO_DB_NAME")
     logger.debug(f"db_name={db_name}")
     logger.debug(f"collection={collection_name}")
@@ -69,6 +174,11 @@ def listening(collection_name: str):
     init_sync_stat_flag = None
     last_sync_time: float | None = None
 
+    # Failure bookkeeping for non-pymongo errors
+    failure_counts: dict = {}   # change _id (str) -> times it has failed in "process"
+    poison_skip: set = set()    # change _ids to skip on replay
+    error_backoff = 2
+
     # start init sync after we get cursor from Change Stream
     Thread(target=init_sync, args=(collection_name,)).start()
     logger.info(f"start listening to change stream for collection {collection_name}")
@@ -83,6 +193,9 @@ def listening(collection_name: str):
         if resume_token:
             watch_kwargs["resume_after"] = resume_token
 
+        change = None
+        phase = "open"  # open | process | flush - tells the handler what failed
+
         try:
             with collection.watch(**watch_kwargs) as stream:
                 logger.info(
@@ -96,6 +209,7 @@ def listening(collection_name: str):
                     before = time.time()
                     change = stream.try_next()
                     after = time.time()
+                    _beat(collection_name)
 
                     if change is None:
                         if (datetime.now() - last_action_time >= timedelta(minutes=5)):
@@ -107,6 +221,7 @@ def listening(collection_name: str):
                             and init_sync_stat_flag == "Y"
                             and last_sync_time is not None
                         ):
+                            phase = "flush"
                             accumulative_df, last_sync_time = process_accumulative_df(
                                 accumulative_df,
                                 collection_name,
@@ -119,6 +234,18 @@ def listening(collection_name: str):
                         continue
 
                     # ---- We have a real change document here ----
+                    phase = "process"
+
+                    change_key = str(change["_id"])
+                    if change_key in poison_skip:
+                        logger.error(
+                            "SKIPPING previously failing change %s (op=%s, documentKey=%s)",
+                            change_key,
+                            change.get("operationType"),
+                            change.get("documentKey"),
+                        )
+                        resume_token = change["_id"]
+                        continue
 
                     if init_sync_stat_flag != "Y":
                         init_sync_stat_flag = read_from_file(
@@ -180,6 +307,7 @@ def listening(collection_name: str):
                             "last_sync_time when first record added: %s", last_sync_time
                         )
 
+                    phase = "flush"
                     accumulative_df, last_sync_time = process_accumulative_df(
                         accumulative_df,
                         collection_name,
@@ -189,6 +317,7 @@ def listening(collection_name: str):
                         resume_token,
                         logger,
                     )
+                    error_backoff = 2  # a full cycle succeeded
 
                 # End inner while True
 
@@ -196,8 +325,12 @@ def listening(collection_name: str):
             pymongo.errors.ConnectionFailure,
             pymongo.errors.CursorNotFound,
             pymongo.errors.OperationFailure,
-            pymongo.Error,
+            # was `pymongo.Error`, which does not exist in pymongo 4.x. Evaluating it
+            # raised AttributeError whenever ANY exception reached this handler,
+            # which escaped listening() and silently killed the thread.
+            PyMongoError,
         ) as exc:
+            _beat(collection_name)
             # Detect non-resumable ChangeStreamHistoryLost / stale resume token.
             is_non_resumable = (
                 isinstance(exc, pymongo.errors.OperationFailure)
@@ -244,6 +377,60 @@ def listening(collection_name: str):
             # Outer while True will rebuild watch_kwargs and reopen.
             # Slight backoff to avoid tight reconnect loop
             time.sleep(2)
+            continue
+
+        except Exception as exc:
+            # Anything else - schema coercion, parquet write, LZ push, file I/O.
+            # Previously these escaped listening() and silently killed the thread.
+            _beat(collection_name)
+
+            if phase == "process" and change is not None:
+                key = str(change["_id"])
+                failure_counts[key] = failure_counts.get(key, 0) + 1
+                attempts = failure_counts[key]
+                if attempts >= MAX_POISON_RETRIES:
+                    poison_skip.add(key)
+                    failure_counts.pop(key, None)
+                    logger.error(
+                        "change %s (op=%s, documentKey=%s) failed %d times while processing; "
+                        "it will be SKIPPED on replay. That document may be stale in Fabric "
+                        "until its next update.",
+                        key,
+                        change.get("operationType"),
+                        change.get("documentKey"),
+                        attempts,
+                        exc_info=True,
+                    )
+                else:
+                    logger.error(
+                        "failed processing change %s (op=%s, documentKey=%s), attempt %d/%d; "
+                        "replaying from last persisted resume token",
+                        key,
+                        change.get("operationType"),
+                        change.get("documentKey"),
+                        attempts,
+                        MAX_POISON_RETRIES,
+                        exc_info=True,
+                    )
+            else:
+                # Flush / LZ failures are batch- or infrastructure-level; never skip,
+                # just keep retrying loudly.
+                logger.error(
+                    "failure in %s phase for %s; discarding unflushed batch and replaying "
+                    "from last persisted resume token (next retry in %ds)",
+                    phase,
+                    collection_name,
+                    error_backoff,
+                    exc_info=True,
+                )
+
+            # Discard the unflushed batch and rewind so nothing is lost.
+            accumulative_df = None
+            last_sync_time = None
+            resume_token = _reload_persisted_resume_token(collection_name, logger)
+
+            time.sleep(error_backoff)
+            error_backoff = min(error_backoff * 2, MAX_ERROR_BACKOFF_SECONDS)
             continue
 
         # If we ever exit the inner loop *without* an exception:
