@@ -97,6 +97,10 @@ def append_to_file(obj: Any, table_name: str, file_name: str, file_type: FileTyp
 
 def delete_file(table_name: str, file_name: str):
     file_full_path = os.path.join(utils.get_table_dir(table_name), file_name)
-    os.remove(file_full_path)
+    try:
+        os.remove(file_full_path)
+    except FileNotFoundError:
+        # Local copy may not exist (e.g. state was loaded from LZ after a restart).
+        pass
     # delete from LZ
     delete_file_from_lz(table_name, file_name)
