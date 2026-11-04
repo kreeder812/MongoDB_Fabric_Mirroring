@@ -188,6 +188,7 @@ FORCED_COLUMN_TYPES = {
     "emailVerified": (bool, "boolean"),    # ds_users, committed boolean
     "coordinatesOnly": (bool, "boolean"),
     "temperatureCapabilities": (float, "float64"),
+    "loadsPerHourByProcessor": (float, "float64"),
 
     # ds_loads numeric columns (bigint -> Int64)
     "miles": (int, "Int64"),
