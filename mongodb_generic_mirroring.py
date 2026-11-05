@@ -151,12 +151,15 @@ def mirror():
         logger.info(f"Received {signal_name}, shutting down mirror() cleanly.")
         stop_event.set()
 
-    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
-    signal.signal(signal.SIGINT, _handle_shutdown_signal)
-
-    logger.info("mirror() startup complete; entering keep-alive wait.")
-    stop_event.wait()
-    logger.info("Shutdown signal received; mirror() exiting.")
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+        signal.signal(signal.SIGINT, _handle_shutdown_signal)
+        logger.info("mirror() startup complete; entering keep-alive wait.")
+        stop_event.wait()
+        logger.info("Shutdown signal received; mirror() exiting.")
+    else:
+        logger.info("mirror() startup complete; running in a worker thread, "
+                    "host process keeps the app alive.")
 
 
 def __get_all_collections() -> list[str]:
